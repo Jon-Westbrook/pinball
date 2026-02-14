@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mineral Chance — Museum Pinball Exhibit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a12;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #header {
+    display: flex;
+    gap: 32px;
+    padding: 12px 24px;
+    background: linear-gradient(180deg, #141428, #0a0a12);
+    width: 100%;
+    justify-content: center;
+    border-bottom: 1px solid #2a2a4a;
+    z-index: 10;
+  }
+
+  .selector-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .selector-group label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #888;
+  }
+
+  .selector-group .options {
+    display: flex;
+    gap: 4px;
+  }
+
+  .selector-group button {
+    padding: 6px 14px;
+    border: 1px solid #3a3a5a;
+    background: #1a1a2e;
+    color: #aaa;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .selector-group button:hover {
+    border-color: #00f0ff;
+    color: #00f0ff;
+  }
+
+  .selector-group button.active {
+    background: #00f0ff22;
+    border-color: #00f0ff;
+    color: #00f0ff;
+    box-shadow: 0 0 10px #00f0ff44;
+  }
+
+  #drop-btn {
+    padding: 10px 32px;
+    border: 2px solid #ff00aa;
+    background: #ff00aa22;
+    color: #ff00aa;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    transition: all 0.2s;
+    align-self: center;
+  }
+
+  #drop-btn:hover {
+    background: #ff00aa44;
+    box-shadow: 0 0 20px #ff00aa66;
+  }
+
+  #drop-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  #canvas-wrap {
+    position: relative;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  canvas {
+    display: block;
+  }
+
+  #debug-panel {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    background: #0a0a12ee;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 11px;
+    line-height: 1.6;
+    min-width: 280px;
+    z-index: 20;
+    transition: border-color 0.3s;
+  }
+
+  #debug-panel.active {
+    border-color: #00f0ff;
+    box-shadow: 0 0 15px #00f0ff33;
+  }
+
+  #debug-panel h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #666;
+    margin-bottom: 6px;
+  }
+
+  #debug-panel .stat {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  #debug-panel .stat .val {
+    color: #00f0ff;
+    font-weight: bold;
+  }
+
+  #debug-panel .stat .val.success { color: #00ff88; }
+  #debug-panel .stat .val.fail { color: #ff4466; }
+  #debug-panel .stat .val.searching { color: #ffaa00; }
+
+  #result-overlay {
+    display: none;
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0a0a12ee;
+    border: 2px solid #00ff88;
+    border-radius: 12px;
+    padding: 16px 32px;
+    text-align: center;
+    z-index: 20;
+    box-shadow: 0 0 30px #00ff8844;
+  }
+
+  #result-overlay h2 {
+    color: #00ff88;
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  #result-overlay p {
+    color: #aaa;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="selector-group">
+    <label>Rock Type</label>
+    <div class="options">
+      <button class="active" data-group="rock" data-value="sedimentary">Sedimentary</button>
+      <button data-group="rock" data-value="igneous">Igneous</button>
+      <button data-group="rock" data-value="metamorphic">Metamorphic</button>
+    </div>
+  </div>
+  <div class="selector-group">
+    <label>Depth</label>
+    <div class="options">
+      <button class="active" data-group="depth" data-value="shallow">Shallow</button>
+      <button data-group="depth" data-value="medium">Medium</button>
+      <button data-group="depth" data-value="deep">Deep</button>
+    </div>
+  </div>
+  <div class="selector-group">
+    <label>Temperature</label>
+    <div class="options">
+      <button class="active" data-group="temp" data-value="low">Low</button>
+      <button data-group="temp" data-value="medium">Medium</button>
+      <button data-group="temp" data-value="high">High</button>
+    </div>
+  </div>
+  <button id="drop-btn">DROP</button>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="game"></canvas>
+</div>
+
+<div id="debug-panel">
+  <h3>Monte Carlo Engine</h3>
+  <div class="stat"><span>Status</span><span class="val" id="dbg-status">IDLE</span></div>
+  <div class="stat"><span>Simulations run</span><span class="val" id="dbg-sims">0</span></div>
+  <div class="stat"><span>Valid paths found</span><span class="val" id="dbg-valid">0</span></div>
+  <div class="stat"><span>Search time</span><span class="val" id="dbg-time">—</span></div>
+  <div class="stat"><span>Selected sim #</span><span class="val" id="dbg-selected">—</span></div>
+  <div class="stat"><span>Target bucket</span><span class="val" id="dbg-bucket">—</span></div>
+  <div class="stat"><span>Required obstacles</span><span class="val" id="dbg-obstacles">—</span></div>
+</div>
+
+<div id="result-overlay">
+  <h2 id="result-mineral">—</h2>
+  <p id="result-desc">—</p>
+</div>
+
+<script>
+// ============================================================
+// MINERAL CHANCE — Monte Carlo Deterministic Pinball
+// ============================================================
+
+const { Engine, World, Bodies, Body, Events, Runner, Composite, Vector } = Matter;
+
+// ---- CONFIGURATION ----
+const CANVAS_W = 600;
+const CANVAS_H = 700;
+const BALL_R = 8;
+const PEG_R = 12;
+const PIPE_W = 60;
+const PIPE_SPEED = 1.8;
+const SIM_COUNT = 800;        // headless simulations per attempt
+const SIM_STEPS = 600;        // physics steps per simulation (~10s at 60Hz)
+const FIXED_DT = 1000 / 60;   // fixed timestep for determinism
+const BUCKET_COUNT = 4;
+const GRAVITY = 1;
+
+// ---- OBSTACLE DEFINITIONS (A-H) ----
+// Positioned across the board in a pinball-like layout
+const OBSTACLE_DEFS = [
+  { id: 'A', x: 150, y: 180, r: PEG_R, color: '#ff4466' },
+  { id: 'B', x: 300, y: 160, r: PEG_R, color: '#ffaa00' },
+  { id: 'C', x: 450, y: 180, r: PEG_R, color: '#00f0ff' },
+  { id: 'D', x: 100, y: 300, r: PEG_R, color: '#ff00aa' },
+  { id: 'E', x: 230, y: 320, r: PEG_R, color: '#88ff00' },
+  { id: 'F', x: 370, y: 300, r: PEG_R, color: '#aa66ff' },
+  { id: 'G', x: 500, y: 320, r: PEG_R, color: '#ff8844' },
+  { id: 'H', x: 300, y: 440, r: PEG_R + 4, color: '#00ff88' },
+];
+
+// Extra scatter pegs for visual density (not labeled, just for physics)
+const SCATTER_PEGS = [
+  { x: 200, y: 240, r: 6 }, { x: 400, y: 240, r: 6 },
+  { x: 150, y: 380, r: 6 }, { x: 450, y: 380, r: 6 },
+  { x: 250, y: 480, r: 6 }, { x: 350, y: 480, r: 6 },
+  { x: 120, y: 440, r: 6 }, { x: 480, y: 440, r: 6 },
+  { x: 200, y: 540, r: 6 }, { x: 400, y: 540, r: 6 },
+  { x: 300, y: 560, r: 6 },
+  { x: 180, y: 160, r: 5 }, { x: 420, y: 160, r: 5 },
+  { x: 260, y: 210, r: 5 }, { x: 340, y: 210, r: 5 },
+  { x: 160, y: 500, r: 5 }, { x: 440, y: 500, r: 5 },
+];
+
+// ---- BUCKET DEFINITIONS ----
+const BUCKET_W = (CANVAS_W - 80) / BUCKET_COUNT;
+const BUCKET_Y = CANVAS_H - 50;
+const BUCKETS = [
+  { id: 0, label: 'Quartz',   x: 40 + BUCKET_W * 0.5, color: '#00f0ff' },
+  { id: 1, label: 'Obsidian', x: 40 + BUCKET_W * 1.5, color: '#ff00aa' },
+  { id: 2, label: 'Marble',   x: 40 + BUCKET_W * 2.5, color: '#00ff88' },
+  { id: 3, label: 'Slate',    x: 40 + BUCKET_W * 3.5, color: '#ffaa00' },
+];
+
+// ---- SELECTION → CONSTRAINT MAPPING ----
+// Maps (rock, depth, temp) → { bucket: number, obstacles: string[] }
+const CONSTRAINT_MAP = {
+  'sedimentary-shallow-low':    { bucket: 0, obstacles: ['A', 'E', 'H'] },
+  'sedimentary-shallow-medium': { bucket: 1, obstacles: ['B', 'F'] },
+  'sedimentary-shallow-high':   { bucket: 2, obstacles: ['C', 'F', 'H'] },
+  'sedimentary-medium-low':     { bucket: 1, obstacles: ['A', 'D'] },
+  'sedimentary-medium-medium':  { bucket: 2, obstacles: ['B', 'E', 'H'] },
+  'sedimentary-medium-high':    { bucket: 3, obstacles: ['C', 'G'] },
+  'sedimentary-deep-low':       { bucket: 2, obstacles: ['D', 'H'] },
+  'sedimentary-deep-medium':    { bucket: 3, obstacles: ['E', 'G'] },
+  'sedimentary-deep-high':      { bucket: 3, obstacles: ['F', 'H'] },
+  'igneous-shallow-low':        { bucket: 1, obstacles: ['B', 'E'] },
+  'igneous-shallow-medium':     { bucket: 0, obstacles: ['A', 'D', 'H'] },
+  'igneous-shallow-high':       { bucket: 3, obstacles: ['C', 'G', 'H'] },
+  'igneous-medium-low':         { bucket: 0, obstacles: ['A', 'F'] },
+  'igneous-medium-medium':      { bucket: 1, obstacles: ['B', 'D', 'H'] },
+  'igneous-medium-high':        { bucket: 2, obstacles: ['E', 'G'] },
+  'igneous-deep-low':           { bucket: 3, obstacles: ['D', 'F', 'H'] },
+  'igneous-deep-medium':        { bucket: 0, obstacles: ['B', 'H'] },
+  'igneous-deep-high':          { bucket: 1, obstacles: ['C', 'F'] },
+  'metamorphic-shallow-low':    { bucket: 2, obstacles: ['A', 'E', 'G'] },
+  'metamorphic-shallow-medium': { bucket: 3, obstacles: ['B', 'D'] },
+  'metamorphic-shallow-high':   { bucket: 0, obstacles: ['C', 'H'] },
+  'metamorphic-medium-low':     { bucket: 3, obstacles: ['A', 'G', 'H'] },
+  'metamorphic-medium-medium':  { bucket: 0, obstacles: ['E', 'F'] },
+  'metamorphic-medium-high':    { bucket: 1, obstacles: ['D', 'G', 'H'] },
+  'metamorphic-deep-low':       { bucket: 1, obstacles: ['A', 'F', 'H'] },
+  'metamorphic-deep-medium':    { bucket: 2, obstacles: ['B', 'G'] },
+  'metamorphic-deep-high':      { bucket: 0, obstacles: ['D', 'E', 'H'] },
+};
+
+// ---- STATE ----
+let selections = { rock: 'sedimentary', depth: 'shallow', temp: 'low' };
+let pipeX = CANVAS_W / 2;
+let pipeDir = 1;
+let dropping = false;
+let ballTrail = [];
+let hitObstacles = new Set();
+let flashingObstacles = {};  // id -> timestamp
+let resultTimeout = null;
+
+// ---- CANVAS SETUP ----
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = CANVAS_W;
+canvas.height = CANVAS_H;
+
+// ---- DEBUG ELEMENTS ----
+const dbgStatus = document.getElementById('dbg-status');
+const dbgSims = document.getElementById('dbg-sims');
+const dbgValid = document.getElementById('dbg-valid');
+const dbgTime = document.getElementById('dbg-time');
+const dbgSelected = document.getElementById('dbg-selected');
+const dbgBucket = document.getElementById('dbg-bucket');
+const dbgObstacles = document.getElementById('dbg-obstacles');
+const debugPanel = document.getElementById('debug-panel');
+
+// ---- SELECTOR UI ----
+document.querySelectorAll('.selector-group button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.group;
+    const value = btn.dataset.value;
+    document.querySelectorAll(`button[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selections[group] = value;
+  });
+});
+
+// ---- PHYSICS WORLD BUILDER ----
+function createWorld() {
+  const engine = Engine.create({
+    gravity: { x: 0, y: GRAVITY, scale: 0.001 }
+  });
+
+  const bodies = [];
+  const obstacleMap = {};
+
+  // Walls
+  const wallOpts = { isStatic: true, restitution: 0.5, friction: 0.1 };
+  bodies.push(Bodies.rectangle(0, CANVAS_H / 2, 20, CANVAS_H, { ...wallOpts, label: 'wall-left' }));
+  bodies.push(Bodies.rectangle(CANVAS_W, CANVAS_H / 2, 20, CANVAS_H, { ...wallOpts, label: 'wall-right' }));
+  bodies.push(Bodies.rectangle(CANVAS_W / 2, CANVAS_H + 30, CANVAS_W, 20, { ...wallOpts, label: 'floor' }));
+
+  // Labeled obstacles A-H
+  OBSTACLE_DEFS.forEach(obs => {
+    const body = Bodies.circle(obs.x, obs.y, obs.r, {
+      isStatic: true,
+      restitution: 0.8,
+      friction: 0.05,
+      label: `obstacle-${obs.id}`,
+    });
+    bodies.push(body);
+    obstacleMap[obs.id] = body;
+  });
+
+  // Scatter pegs
+  SCATTER_PEGS.forEach((p, i) => {
+    bodies.push(Bodies.circle(p.x, p.y, p.r, {
+      isStatic: true,
+      restitution: 0.6,
+      friction: 0.05,
+      label: `scatter-${i}`,
+    }));
+  });
+
+  // Bucket dividers
+  for (let i = 0; i <= BUCKET_COUNT; i++) {
+    const bx = 40 + i * BUCKET_W;
+    bodies.push(Bodies.rectangle(bx, BUCKET_Y + 20, 6, 50, {
+      isStatic: true, restitution: 0.3, friction: 0.2, label: `divider-${i}`,
+    }));
+  }
+
+  // Angled guides near bottom to funnel ball into buckets
+  bodies.push(Bodies.rectangle(60, CANVAS_H - 100, 80, 6, {
+    isStatic: true, angle: Math.PI * 0.15, restitution: 0.4, label: 'guide-l'
+  }));
+  bodies.push(Bodies.rectangle(CANVAS_W - 60, CANVAS_H - 100, 80, 6, {
+    isStatic: true, angle: -Math.PI * 0.15, restitution: 0.4, label: 'guide-r'
+  }));
+
+  Composite.add(engine.world, bodies);
+  return { engine, obstacleMap };
+}
+
+// ---- MONTE CARLO SIMULATION ----
+function runMonteCarloSearch(startX, targetBucket, requiredObstacles) {
+  const t0 = performance.now();
+  const validRuns = [];
+
+  for (let i = 0; i < SIM_COUNT; i++) {
+    // Micro-variations in initial velocity
+    const vx = (Math.random() - 0.5) * 3;
+    const vy = Math.random() * 0.5;
+
+    const { engine, obstacleMap } = createWorld();
+
+    // Create ball
+    const ball = Bodies.circle(startX, 60, BALL_R, {
+      restitution: 0.6,
+      friction: 0.05,
+      density: 0.002,
+      label: 'ball',
+    });
+    Body.setVelocity(ball, { x: vx, y: vy });
+    Composite.add(engine.world, [ball]);
+
+    // Track collisions
+    const hitSet = new Set();
+    Events.on(engine, 'collisionStart', (event) => {
+      event.pairs.forEach(pair => {
+        const labels = [pair.bodyA.label, pair.bodyB.label];
+        labels.forEach(l => {
+          if (l.startsWith('obstacle-')) {
+            hitSet.add(l.replace('obstacle-', ''));
+          }
+        });
+      });
+    });
+
+    // Run simulation headlessly
+    for (let step = 0; step < SIM_STEPS; step++) {
+      Engine.update(engine, FIXED_DT);
+    }
+
+    // Check which bucket the ball landed in
+    const ballX = ball.position.x;
+    const ballY = ball.position.y;
+    let landedBucket = -1;
+
+    if (ballY > BUCKET_Y - 10) {
+      for (let b = 0; b < BUCKET_COUNT; b++) {
+        const bLeft = 40 + b * BUCKET_W;
+        const bRight = bLeft + BUCKET_W;
+        if (ballX >= bLeft && ballX <= bRight) {
+          landedBucket = b;
+          break;
+        }
+      }
+    }
+
+    // Check constraints
+    const hitsRequired = requiredObstacles.every(o => hitSet.has(o));
+
+    if (landedBucket === targetBucket && hitsRequired) {
+      validRuns.push({
+        index: i,
+        vx, vy,
+        obstaclesHit: [...hitSet],
+        bucket: landedBucket,
+      });
+    }
+
+    // Clean up
+    Engine.clear(engine);
+  }
+
+  const elapsed = performance.now() - t0;
+  return { validRuns, elapsed, totalSims: SIM_COUNT };
+}
+
+// ---- VISUAL PHYSICS WORLD (the one we render) ----
+let renderEngine = null;
+let renderBall = null;
+
+function createRenderWorld() {
+  const { engine, obstacleMap } = createWorld();
+  renderEngine = engine;
+  return { engine, obstacleMap };
+}
+
+// ---- RENDERING ----
+function drawGlow(x, y, r, color, alpha = 0.6) {
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+  gradient.addColorStop(0, color + Math.floor(alpha * 255).toString(16).padStart(2, '0'));
+  gradient.addColorStop(1, color + '00');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function render() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Background grid
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < CANVAS_W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); ctx.stroke();
+  }
+  for (let y = 0; y < CANVAS_H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke();
+  }
+
+  // Pipe
+  const pipeGrad = ctx.createLinearGradient(pipeX - PIPE_W/2, 20, pipeX + PIPE_W/2, 20);
+  pipeGrad.addColorStop(0, '#2a2a4a');
+  pipeGrad.addColorStop(0.5, '#4a4a6a');
+  pipeGrad.addColorStop(1, '#2a2a4a');
+  ctx.fillStyle = pipeGrad;
+  ctx.fillRect(pipeX - PIPE_W/2, 10, PIPE_W, 30);
+  // Pipe neon outline
+  ctx.strokeStyle = '#00f0ff66';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pipeX - PIPE_W/2, 10, PIPE_W, 30);
+  // Pipe opening
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(pipeX - 8, 35, 16, 8);
+
+  // Labeled obstacles
+  OBSTACLE_DEFS.forEach(obs => {
+    const now = Date.now();
+    const flashTime = flashingObstacles[obs.id];
+    let glowIntensity = 0.4;
+    let sizeBoost = 0;
+
+    if (flashTime && now - flashTime < 500) {
+      const t = 1 - (now - flashTime) / 500;
+      glowIntensity = 0.4 + t * 0.6;
+      sizeBoost = t * 4;
+    }
+
+    drawGlow(obs.x, obs.y, obs.r + sizeBoost, obs.color, glowIntensity);
+
+    ctx.fillStyle = obs.color;
+    ctx.beginPath();
+    ctx.arc(obs.x, obs.y, obs.r + sizeBoost, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = '#0a0a12';
+    ctx.font = 'bold 12px Courier New';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(obs.id, obs.x, obs.y);
+
+    // Hit indicator
+    if (hitObstacles.has(obs.id)) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(obs.x, obs.y, obs.r + 6 + sizeBoost, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+
+  // Scatter pegs
+  SCATTER_PEGS.forEach(p => {
+    ctx.fillStyle = '#2a2a4a';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#3a3a5a';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  });
+
+  // Bucket dividers and labels
+  for (let i = 0; i <= BUCKET_COUNT; i++) {
+    const bx = 40 + i * BUCKET_W;
+    ctx.fillStyle = '#3a3a5a';
+    ctx.fillRect(bx - 3, BUCKET_Y - 5, 6, 55);
+  }
+
+  BUCKETS.forEach(b => {
+    ctx.fillStyle = b.color + '22';
+    ctx.fillRect(b.x - BUCKET_W/2 + 3, BUCKET_Y, BUCKET_W - 6, 45);
+
+    ctx.fillStyle = b.color;
+    ctx.font = 'bold 11px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.label, b.x, BUCKET_Y + 25);
+  });
+
+  // Angled guides
+  ctx.save();
+  ctx.translate(60, CANVAS_H - 100);
+  ctx.rotate(Math.PI * 0.15);
+  ctx.fillStyle = '#2a2a4a';
+  ctx.fillRect(-40, -3, 80, 6);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(CANVAS_W - 60, CANVAS_H - 100);
+  ctx.rotate(-Math.PI * 0.15);
+  ctx.fillStyle = '#2a2a4a';
+  ctx.fillRect(-40, -3, 80, 6);
+  ctx.restore();
+
+  // Ball trail
+  for (let i = 0; i < ballTrail.length; i++) {
+    const t = i / ballTrail.length;
+    const p = ballTrail[i];
+    ctx.fillStyle = `rgba(0, 240, 255, ${t * 0.4})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, BALL_R * t * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Ball
+  if (renderBall && dropping) {
+    const bx = renderBall.position.x;
+    const by = renderBall.position.y;
+
+    drawGlow(bx, by, BALL_R, '#00f0ff', 0.8);
+
+    // Ball body
+    const ballGrad = ctx.createRadialGradient(bx - 2, by - 2, 0, bx, by, BALL_R);
+    ballGrad.addColorStop(0, '#ffffff');
+    ballGrad.addColorStop(0.5, '#00f0ff');
+    ballGrad.addColorStop(1, '#0088aa');
+    ctx.fillStyle = ballGrad;
+    ctx.beginPath();
+    ctx.arc(bx, by, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Update trail
+    ballTrail.push({ x: bx, y: by });
+    if (ballTrail.length > 40) ballTrail.shift();
+  }
+}
+
+// ---- MAIN LOOP ----
+let lastTime = 0;
+let simStepsRemaining = 0;
+let selectedRun = null;
+
+function gameLoop(timestamp) {
+  const dt = timestamp - lastTime;
+  lastTime = timestamp;
+
+  // Move pipe
+  if (!dropping) {
+    pipeX += pipeDir * PIPE_SPEED;
+    if (pipeX > CANVAS_W - 50) pipeDir = -1;
+    if (pipeX < 50) pipeDir = 1;
+  }
+
+  // Step physics for visual ball
+  if (dropping && renderEngine && simStepsRemaining > 0) {
+    Engine.update(renderEngine, FIXED_DT);
+    simStepsRemaining--;
+
+    // Check if ball settled or simulation done
+    if (simStepsRemaining <= 0 || (renderBall && renderBall.position.y > CANVAS_H + 20)) {
+      finishDrop();
+    }
+  }
+
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// ---- DROP LOGIC ----
+document.getElementById('drop-btn').addEventListener('click', () => {
+  if (dropping) return;
+  startDrop();
+});
+
+function startDrop() {
+  dropping = true;
+  ballTrail = [];
+  hitObstacles.clear();
+  flashingObstacles = {};
+  document.getElementById('drop-btn').disabled = true;
+  document.getElementById('result-overlay').style.display = 'none';
+
+  const key = `${selections.rock}-${selections.depth}-${selections.temp}`;
+  const constraint = CONSTRAINT_MAP[key];
+
+  // Update debug
+  dbgStatus.textContent = 'SEARCHING...';
+  dbgStatus.className = 'val searching';
+  dbgBucket.textContent = BUCKETS[constraint.bucket].label;
+  dbgObstacles.textContent = constraint.obstacles.join(', ');
+  dbgSims.textContent = '...';
+  dbgValid.textContent = '...';
+  dbgTime.textContent = '...';
+  dbgSelected.textContent = '...';
+  debugPanel.classList.add('active');
+
+  const currentPipeX = pipeX;
+
+  // Run Monte Carlo search asynchronously (setTimeout to let UI update)
+  setTimeout(() => {
+    const result = runMonteCarloSearch(currentPipeX, constraint.bucket, constraint.obstacles);
+
+    // Update debug panel
+    dbgSims.textContent = result.totalSims.toLocaleString();
+    dbgValid.textContent = result.validRuns.length.toString();
+    dbgTime.textContent = result.elapsed.toFixed(1) + 'ms';
+
+    if (result.validRuns.length > 0) {
+      // Pick a random valid run
+      const pick = result.validRuns[Math.floor(Math.random() * result.validRuns.length)];
+      selectedRun = pick;
+
+      dbgStatus.textContent = 'FOUND PATH';
+      dbgStatus.className = 'val success';
+      dbgSelected.textContent = `#${pick.index}`;
+
+      // Now replay this exact run visually
+      replayRun(currentPipeX, pick);
+    } else {
+      // No valid path from this position — try again next frame
+      dbgStatus.textContent = 'RETRYING...';
+      dbgStatus.className = 'val fail';
+
+      // Let pipe move a bit and retry
+      dropping = false;
+      setTimeout(() => startDrop(), 100);
+    }
+  }, 16);
+}
+
+function replayRun(startX, run) {
+  const { engine, obstacleMap } = createRenderWorld();
+
+  renderBall = Bodies.circle(startX, 60, BALL_R, {
+    restitution: 0.6,
+    friction: 0.05,
+    density: 0.002,
+    label: 'ball',
+  });
+  Body.setVelocity(renderBall, { x: run.vx, y: run.vy });
+  Composite.add(engine.world, [renderBall]);
+
+  // Track collisions for visual feedback
+  Events.on(engine, 'collisionStart', (event) => {
+    event.pairs.forEach(pair => {
+      const labels = [pair.bodyA.label, pair.bodyB.label];
+      labels.forEach(l => {
+        if (l.startsWith('obstacle-')) {
+          const id = l.replace('obstacle-', '');
+          hitObstacles.add(id);
+          flashingObstacles[id] = Date.now();
+        }
+      });
+    });
+  });
+
+  simStepsRemaining = SIM_STEPS;
+}
+
+function finishDrop() {
+  dropping = false;
+  document.getElementById('drop-btn').disabled = false;
+  debugPanel.classList.remove('active');
+  dbgStatus.textContent = 'COMPLETE';
+  dbgStatus.className = 'val success';
+
+  if (selectedRun) {
+    const bucket = BUCKETS[selectedRun.bucket];
+    const overlay = document.getElementById('result-overlay');
+    document.getElementById('result-mineral').textContent = bucket.label;
+    document.getElementById('result-desc').textContent =
+      `Hit obstacles: ${selectedRun.obstaclesHit.join(', ')} → ${bucket.label}`;
+    overlay.style.display = 'block';
+    overlay.style.borderColor = bucket.color;
+    overlay.style.boxShadow = `0 0 30px ${bucket.color}44`;
+
+    if (resultTimeout) clearTimeout(resultTimeout);
+    resultTimeout = setTimeout(() => {
+      overlay.style.display = 'none';
+    }, 4000);
+  }
+}
+
+// ---- INIT ----
+createRenderWorld();
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
