@@ -11,8 +11,9 @@
     background: #0a0a12;
     color: #e0e0e0;
     font-family: 'Courier New', monospace;
-    overflow: hidden;
-    height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -25,8 +26,20 @@
     background: linear-gradient(180deg, #141428, #0a0a12);
     width: 100%;
     justify-content: center;
+    flex-wrap: wrap;
     border-bottom: 1px solid #2a2a4a;
     z-index: 10;
+  }
+
+  @media (max-width: 640px) {
+    #header { gap: 12px; padding: 8px 8px; }
+    .selector-group button { padding: 4px 8px; font-size: 9px; }
+    .selector-group label { font-size: 8px; letter-spacing: 1px; }
+    #drop-btn { padding: 8px 20px; font-size: 12px; }
+    #debug-panel { font-size: 9px; min-width: 200px; padding: 8px 10px; bottom: 6px; right: 6px; }
+    #result-overlay { bottom: 60px; padding: 10px 18px; }
+    #result-overlay h2 { font-size: 14px; }
+    #result-overlay p { font-size: 10px; }
   }
 
   .selector-group {
@@ -105,10 +118,14 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
+    width: 100%;
+    overflow: hidden;
   }
 
   canvas {
     display: block;
+    max-width: 100%;
+    height: auto;
   }
 
   #debug-panel {
